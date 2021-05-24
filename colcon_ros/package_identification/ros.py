@@ -27,7 +27,7 @@ class RosPackageIdentification(
     """Identify ROS packages with `package.xml` files."""
 
     # the priority needs to be higher than the extensions identifying packages
-    # using the build systems supported by ROS (CMake and Python)
+    # using the build systems supported by ROS (CMake, Cargo and Python)
     PRIORITY = 150
 
     def __init__(self):  # noqa: D107
@@ -65,13 +65,17 @@ class RosPackageIdentification(
             return
 
         # for Python build types ensure that a setup.py file exists
-        if build_type == 'ament_python':
-            setup_py = desc.path / 'setup.py'
-            if not setup_py.is_file():
+        # for Cargo build types ensure that a Cargo.toml file exists
+        required_files = {'ament_python': 'setup.py', 'ament_cargo': 'Cargo.toml.in'}
+        filename = required_files.get(build_type)
+        if filename is not None:
+            filepath = desc.path / filename
+            if not filepath.is_file():
                 logger.error(
                     "ROS package '{desc.path}' with build type '{build_type}' "
-                    "has no 'setup.py' file" .format_map(locals()))
+                    "has no '{filename}' file" .format_map(locals()))
                 raise IgnoreLocationException()
+
 
         desc.type = 'ros.{build_type}'.format_map(locals())
 
@@ -111,7 +115,7 @@ class RosPackageIdentification(
             for _ in (1, ):
                 # try to get information from setup.cfg file
                 if setup_cfg.is_file():
-                    if is_reading_cfg_sufficient(setup_py):
+                    if is_reading_cfg_sufficient(desc.path / 'setup.py'):
                         config = get_configuration(setup_cfg)
                         name = config.get('metadata', {}).get('name')
                         if name:
